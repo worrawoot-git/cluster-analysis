@@ -1,0 +1,1101 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>วิเคราะห์ Cluster และ PCA</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&family=Prompt:wght@500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root{
+  --bg:#f4f6fb; --card:#ffffff; --ink:#1d2433; --muted:#5d6678; --line:#e3e7ef;
+  --brand:#2f5bea; --brand-dark:#1e3a8a; --accent:#0f9d8a; --danger:#d93f3f;
+  --soft:#eef2ff; --interp:#f0fdf9; --warn-bg:#fff7ed; --warn:#c2410c;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:'Sarabun',system-ui,sans-serif;font-size:16px;line-height:1.65}
+h1,h2,h3{font-family:'Prompt','Sarabun',sans-serif;line-height:1.3}
+header{background:linear-gradient(135deg,var(--brand-dark),var(--brand));color:#fff;padding:30px 0 34px}
+header h1{margin:0 0 6px;font-size:clamp(22px,4vw,32px)}
+header p{margin:0;opacity:.9;max-width:780px}
+.wrap{max-width:1200px;margin:0 auto;padding:0 16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:22px;margin:18px 0;box-shadow:0 1px 3px rgba(20,30,60,.05)}
+.card h2{margin:0 0 14px;font-size:20px}
+.form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,360px),1fr));gap:20px}
+.lbl{font-weight:600;display:block;margin-bottom:6px}
+select,input[type=number]{font:inherit;padding:10px 12px;border:1px solid #cdd4e2;border-radius:10px;background:#fff;color:var(--ink);width:100%}
+select:focus,input:focus{outline:2px solid var(--brand);outline-offset:1px}
+.hint{color:var(--muted);font-size:14px;margin:6px 0 0}
+.dropzone{display:flex;align-items:center;justify-content:center;text-align:center;min-height:92px;border:2px dashed #b9c3da;border-radius:12px;background:var(--soft);cursor:pointer;padding:14px;transition:.15s;color:var(--muted)}
+.dropzone:hover,.dropzone.drag{border-color:var(--brand);background:#e3e9ff;color:var(--brand-dark)}
+.dropzone input{display:none}
+.dropzone b{color:var(--brand-dark)}
+.row-btns{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.btn{font:inherit;font-weight:600;border:none;border-radius:10px;padding:11px 20px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:.15s}
+.btn.primary{background:var(--brand);color:#fff}
+.btn.primary:hover{background:var(--brand-dark)}
+.btn.danger{background:#fff;color:var(--danger);border:1.5px solid var(--danger)}
+.btn.danger:hover{background:#fdecec}
+.btn.ghost{background:#fff;color:var(--brand-dark);border:1px solid #c7d0e6}
+.btn.ghost:hover{background:var(--soft)}
+.btn.small{padding:6px 12px;font-size:14px;border-radius:8px}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.actions{display:flex;flex-wrap:wrap;gap:12px;margin-top:22px;padding-top:18px;border-top:1px solid var(--line)}
+.sub{margin-top:22px;padding-top:18px;border-top:1px solid var(--line)}
+.sub h3{margin:0 0 10px;font-size:16px}
+.cols-head{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:8px}
+.cols-list{display:flex;flex-wrap:wrap;gap:8px}
+.chip{display:inline-flex;align-items:center;gap:6px;border:1px solid #cdd4e2;border-radius:999px;padding:5px 12px;background:#fff;cursor:pointer;font-size:15px}
+.chip small{color:var(--muted);font-size:12px}
+.chip.disabled{opacity:.5;cursor:not-allowed;background:#f6f7fa}
+.chip:has(input:checked){border-color:var(--brand);background:var(--soft)}
+.opts{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));gap:16px;align-items:end}
+.opt .inline{display:flex;gap:8px}
+.opt .inline select{flex:1.6}.opt .inline input{flex:1}
+.check{display:flex;gap:8px;align-items:center;font-weight:600;cursor:pointer}
+.check input{width:18px;height:18px}
+.msg{margin-top:14px;padding:12px 14px;border-radius:10px;font-size:15px}
+.msg.error{background:#fdecec;color:#9b1c1c;border:1px solid #f5c2c2}
+.msg.info{background:var(--soft);color:var(--brand-dark);border:1px solid #cfd8f7}
+.msg.warn{background:var(--warn-bg);color:var(--warn);border:1px solid #fcd9b6}
+.res-head{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px}
+.res-head h2{margin:0}
+.stat-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px}
+.stat{border:1px solid var(--line);border-radius:12px;padding:12px 14px;background:linear-gradient(180deg,#fff,#f8faff)}
+.stat .k{font-size:13px;color:var(--muted)}
+.stat .v{font-family:'Prompt',sans-serif;font-size:22px;font-weight:600;color:var(--brand-dark)}
+.stat .s{font-size:13px;color:var(--muted)}
+.interp{background:var(--interp);border-left:4px solid var(--accent);border-radius:10px;padding:16px 20px;margin-top:18px}
+.interp h3{margin:0 0 8px;font-size:17px;color:#0b6b5e}
+.interp ul{margin:6px 0;padding-left:20px}
+.interp li{margin:5px 0}
+.interp .note{font-size:14px;color:var(--muted);margin-top:10px}
+.charts{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,480px),1fr));gap:18px}
+.chart-card{border:1px solid var(--line);border-radius:12px;padding:12px;background:#fff;min-width:0}
+.chart-card.wide{grid-column:1/-1}
+.chart-head{display:flex;justify-content:flex-end;margin-bottom:4px}
+.chart-box{position:relative;height:380px}
+.chart-card.wide .chart-box{height:460px}
+.chart-card .hint{margin:8px 4px 2px}
+.table-card{margin-bottom:22px}
+.table-card .t-head{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:8px}
+.table-card h3{margin:0;font-size:16px}
+.tbl-wrap{overflow:auto;max-height:440px;border:1px solid var(--line);border-radius:10px}
+table.data{border-collapse:collapse;width:100%;font-size:14px;white-space:nowrap}
+table.data th{position:sticky;top:0;background:#eef2fb;color:#24305e;font-weight:600;text-align:left;padding:8px 12px;border-bottom:1px solid #d5dcec;z-index:1}
+table.data td{padding:7px 12px;border-bottom:1px solid #eef0f5}
+table.data td.num{text-align:right;font-variant-numeric:tabular-nums}
+table.data tr:nth-child(even) td{background:#fafbfe}
+table.data td.hl{background:#e6f7f2!important;font-weight:600}
+.preview .tbl-wrap{max-height:230px}
+.loading{position:fixed;inset:0;background:rgba(15,23,42,.45);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:50;color:#fff;font-weight:600}
+.spinner{width:52px;height:52px;border:5px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin 1s linear infinite;margin-bottom:12px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.hidden{display:none!important}
+footer{color:var(--muted);font-size:13px;text-align:center;padding:10px 0 30px}
+@media (max-width:600px){.card{padding:16px}.chart-box{height:320px}.chart-card.wide .chart-box{height:380px}}
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <h1>📊 เครื่องมือวิเคราะห์ Cluster Analysis &amp; PCA</h1>
+    <p>เลือกรูปแบบการวิเคราะห์ แนบไฟล์ Excel แล้วกดวิเคราะห์ ระบบจะแสดงผลเป็นตาราง กราฟ และคำอธิบายด้วยค่าสถิติ — ประมวลผลบนเบราว์เซอร์ของคุณทั้งหมด ไม่มีการส่งข้อมูลออกไปภายนอก</p>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="card" id="setupCard">
+    <h2>1. ตั้งค่าการวิเคราะห์</h2>
+    <div class="form-grid">
+      <div>
+        <label class="lbl" for="method">รูปแบบการวิเคราะห์</label>
+        <select id="method">
+          <option value="kmeans">Cluster Analysis — K-Means</option>
+          <option value="hclust">Cluster Analysis — Hierarchical (แบบลำดับชั้น)</option>
+          <option value="pca">Principal Component Analysis (PCA)</option>
+        </select>
+        <p class="hint" id="methodHint"></p>
+      </div>
+      <div>
+        <span class="lbl">แนบไฟล์ข้อมูล (.xlsx, .xls, .csv)</span>
+        <label class="dropzone" id="dropzone">
+          <input type="file" id="fileInput" accept=".xlsx,.xls,.csv">
+          <span id="fileName">📁 คลิกเพื่อเลือกไฟล์ หรือลากไฟล์มาวางที่นี่<br><small>แถวแรกต้องเป็นชื่อคอลัมน์</small></span>
+        </label>
+        <div class="row-btns">
+          <button class="btn ghost small" id="btnSample" type="button">ใช้ข้อมูลตัวอย่าง</button>
+          <button class="btn ghost small" id="btnSampleDl" type="button">⬇ ดาวน์โหลดไฟล์ตัวอย่าง</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="dataSetup" class="hidden">
+      <div class="sub">
+        <div class="form-grid">
+          <div>
+            <label class="lbl" for="sheetSel">ชีตข้อมูล</label>
+            <select id="sheetSel"></select>
+          </div>
+          <div>
+            <label class="lbl" for="labelCol">คอลัมน์ป้ายกำกับ / รหัสข้อมูล (ไม่บังคับ)</label>
+            <select id="labelCol"></select>
+          </div>
+        </div>
+      </div>
+      <div class="sub">
+        <div class="cols-head">
+          <h3>ตัวแปรที่ใช้วิเคราะห์ <span class="hint" id="colCount"></span></h3>
+          <div class="row-btns" style="margin:0">
+            <button class="btn ghost small" id="btnAllCols" type="button">เลือกทั้งหมด</button>
+            <button class="btn ghost small" id="btnNoCols" type="button">ล้างการเลือก</button>
+          </div>
+        </div>
+        <div class="cols-list" id="colList"></div>
+        <p class="hint">ระบบเลือกเฉพาะคอลัมน์ที่เป็นตัวเลขให้อัตโนมัติ แถวที่มีค่าว่างหรือไม่ใช่ตัวเลขในตัวแปรที่เลือกจะถูกตัดออก (Listwise deletion)</p>
+      </div>
+      <div class="sub preview">
+        <h3>ตัวอย่างข้อมูล (5 แถวแรก) <span class="hint" id="rowInfo"></span></h3>
+        <div class="tbl-wrap" id="previewBox"></div>
+      </div>
+    </div>
+
+    <div class="sub">
+      <h3>ตัวเลือกการวิเคราะห์</h3>
+      <div class="opts">
+        <label class="check" id="stdWrap"><input type="checkbox" id="optStd" checked> <span id="stdText">ปรับมาตรฐานข้อมูล (Z-score) ก่อนวิเคราะห์</span></label>
+        <div class="opt" data-for="kmeans hclust">
+          <label class="lbl" for="optKMode">จำนวนกลุ่ม (k)</label>
+          <div class="inline">
+            <select id="optKMode">
+              <option value="auto">อัตโนมัติ (Silhouette สูงสุด)</option>
+              <option value="manual">กำหนดเอง</option>
+            </select>
+            <input type="number" id="optK" min="2" max="30" value="3" disabled aria-label="จำนวนกลุ่ม">
+          </div>
+        </div>
+        <div class="opt" data-for="hclust">
+          <label class="lbl" for="optLink">วิธีเชื่อมโยง (Linkage)</label>
+          <select id="optLink">
+            <option value="ward">Ward (แนะนำ)</option>
+            <option value="complete">Complete linkage</option>
+            <option value="average">Average linkage (UPGMA)</option>
+            <option value="single">Single linkage</option>
+          </select>
+        </div>
+        <div class="opt" data-for="pca">
+          <label class="lbl" for="optPcMode">จำนวนองค์ประกอบหลักที่เก็บไว้</label>
+          <div class="inline">
+            <select id="optPcMode">
+              <option value="kaiser">อัตโนมัติ (Eigenvalue &gt; 1)</option>
+              <option value="var80">อัตโนมัติ (ความแปรปรวนสะสม ≥ 80%)</option>
+              <option value="manual">กำหนดเอง</option>
+            </select>
+            <input type="number" id="optPc" min="1" max="50" value="2" disabled aria-label="จำนวนองค์ประกอบ">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button class="btn primary" id="btnRun" type="button">▶ วิเคราะห์ข้อมูล</button>
+      <button class="btn danger" id="btnReset" type="button">↺ รีเซ็ตหน้า</button>
+    </div>
+    <div id="msg"></div>
+  </section>
+
+  <section id="results" class="hidden">
+    <div class="card">
+      <div class="res-head">
+        <h2 id="resTitle">2. ผลการวิเคราะห์</h2>
+        <button class="btn primary small" id="btnAllXlsx" type="button">⬇ ดาวน์โหลดตารางทั้งหมด (Excel)</button>
+      </div>
+      <div class="stat-cards" id="statCards"></div>
+      <div class="interp" id="interp"></div>
+    </div>
+    <div class="card">
+      <h2>3. กราฟ</h2>
+      <div class="charts" id="charts"></div>
+    </div>
+    <div class="card">
+      <h2>4. ตารางผลลัพธ์</h2>
+      <div id="tables"></div>
+    </div>
+  </section>
+</main>
+<footer>คำนวณด้วย JavaScript บนเครื่องของผู้ใช้ · อ่านไฟล์ด้วย SheetJS · วาดกราฟด้วย Chart.js</footer>
+
+<div id="loading" class="loading hidden"><div class="spinner"></div><div>กำลังวิเคราะห์ข้อมูล...</div></div>
+
+<script id="core">
+// ==CORE START==
+const S = {};
+S.mean = a => { let s = 0; for (const v of a) s += v; return s / a.length; };
+S.sd = (a, m) => { if (m === undefined) m = S.mean(a); let s = 0; for (const v of a) s += (v - m) ** 2; return Math.sqrt(s / (a.length - 1)); };
+S.median = a => { const b = [...a].sort((x, y) => x - y), n = b.length; return n % 2 ? b[(n - 1) / 2] : (b[n / 2 - 1] + b[n / 2]) / 2; };
+S.skew = (a, m, s) => { const n = a.length; if (n < 3 || !(s > 0)) return NaN; let t = 0; for (const v of a) t += ((v - m) / s) ** 3; return t * n / ((n - 1) * (n - 2)); };
+S.dist2 = (a, b) => { let s = 0; for (let i = 0; i < a.length; i++) { const d = a[i] - b[i]; s += d * d; } return s; };
+S.rng = seed => { let t = seed >>> 0; return () => { t += 0x6D2B79F5; let r = Math.imul(t ^ (t >>> 15), 1 | t); r ^= r + Math.imul(r ^ (r >>> 7), 61 | r); return ((r ^ (r >>> 14)) >>> 0) / 4294967296; }; };
+
+S.descStats = X => {
+  const p = X[0].length;
+  const out = [];
+  for (let j = 0; j < p; j++) {
+    const col = X.map(r => r[j]);
+    const m = S.mean(col), sd = S.sd(col, m);
+    out.push({ n: col.length, mean: m, sd, min: Math.min(...col), median: S.median(col), max: Math.max(...col), skew: S.skew(col, m, sd) });
+  }
+  return out;
+};
+
+S.crossProd = (Z, div) => {
+  const n = Z.length, p = Z[0].length;
+  const C = Array.from({ length: p }, () => new Array(p).fill(0));
+  for (let i = 0; i < n; i++) { const r = Z[i]; for (let a = 0; a < p; a++) { const ra = r[a]; for (let b = a; b < p; b++) C[a][b] += ra * r[b]; } }
+  for (let a = 0; a < p; a++) for (let b = a; b < p; b++) { C[a][b] /= div; C[b][a] = C[a][b]; }
+  return C;
+};
+
+S.standardize = (X, means, sds) => X.map(r => r.map((v, j) => (v - means[j]) / sds[j]));
+
+// Jacobi eigen decomposition for symmetric matrices
+S.jacobi = A0 => {
+  const n = A0.length, A = A0.map(r => r.slice());
+  const V = Array.from({ length: n }, (_, i) => Array.from({ length: n }, (_, j) => (i === j ? 1 : 0)));
+  for (let sweep = 0; sweep < 100; sweep++) {
+    let off = 0;
+    for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) off += A[i][j] ** 2;
+    if (off < 1e-22) break;
+    for (let p = 0; p < n; p++) for (let q = p + 1; q < n; q++) {
+      if (Math.abs(A[p][q]) < 1e-300) continue;
+      const theta = (A[q][q] - A[p][p]) / (2 * A[p][q]);
+      const t = (theta >= 0 ? 1 : -1) / (Math.abs(theta) + Math.sqrt(theta * theta + 1));
+      const c = 1 / Math.sqrt(t * t + 1), s = t * c;
+      for (let k = 0; k < n; k++) { const akp = A[k][p], akq = A[k][q]; A[k][p] = c * akp - s * akq; A[k][q] = s * akp + c * akq; }
+      for (let k = 0; k < n; k++) { const apk = A[p][k], aqk = A[q][k]; A[p][k] = c * apk - s * aqk; A[q][k] = s * apk + c * aqk; }
+      for (let k = 0; k < n; k++) { const vkp = V[k][p], vkq = V[k][q]; V[k][p] = c * vkp - s * vkq; V[k][q] = s * vkp + c * vkq; }
+    }
+  }
+  const idx = [...Array(n).keys()].sort((a, b) => A[b][b] - A[a][a]);
+  const values = idx.map(i => A[i][i]);
+  const vectors = idx.map(i => { const v = V.map(r => r[i]); const sum = v.reduce((s, x) => s + x, 0); return sum < 0 ? v.map(x => -x) : v; });
+  return { values, vectors }; // vectors[k] = k-th eigenvector
+};
+
+S.inverse = A => {
+  const n = A.length;
+  const M = A.map((r, i) => [...r, ...Array.from({ length: n }, (_, j) => (i === j ? 1 : 0))]);
+  for (let c = 0; c < n; c++) {
+    let piv = c;
+    for (let r = c + 1; r < n; r++) if (Math.abs(M[r][c]) > Math.abs(M[piv][c])) piv = r;
+    if (Math.abs(M[piv][c]) < 1e-12) return null;
+    [M[c], M[piv]] = [M[piv], M[c]];
+    const d = M[c][c];
+    for (let j = 0; j < 2 * n; j++) M[c][j] /= d;
+    for (let r = 0; r < n; r++) { if (r === c) continue; const f = M[r][c]; if (f) for (let j = 0; j < 2 * n; j++) M[r][j] -= f * M[c][j]; }
+  }
+  return M.map(r => r.slice(n));
+};
+
+S.lnGamma = z => {
+  const c = [0.99999999999980993, 676.5203681218851, -1259.1392167224028, 771.32342877765313, -176.61502916214059, 12.507343278686905, -0.13857109526572012, 9.9843695780195716e-6, 1.5056327351493116e-7];
+  if (z < 0.5) return Math.log(Math.PI / Math.sin(Math.PI * z)) - S.lnGamma(1 - z);
+  z -= 1; let x = c[0]; for (let i = 1; i < 9; i++) x += c[i] / (z + i);
+  const t = z + 7.5; return 0.5 * Math.log(2 * Math.PI) + (z + 0.5) * Math.log(t) - t + Math.log(x);
+};
+// upper regularized incomplete gamma Q(a,x)
+S.gammaQ = (a, x) => {
+  if (x <= 0) return 1;
+  const lpre = -x + a * Math.log(x) - S.lnGamma(a);
+  if (x < a + 1) {
+    let sum = 1 / a, del = sum, ap = a;
+    for (let n = 0; n < 1000; n++) { ap++; del *= x / ap; sum += del; if (Math.abs(del) < Math.abs(sum) * 1e-15) break; }
+    return Math.max(0, 1 - sum * Math.exp(lpre));
+  }
+  const FP = 1e-300; let b = x + 1 - a, c = 1 / FP, d = 1 / b, h = d;
+  for (let i = 1; i < 1000; i++) { const an = -i * (i - a); b += 2; d = an * d + b; if (Math.abs(d) < FP) d = FP; c = b + an / c; if (Math.abs(c) < FP) c = FP; d = 1 / d; const del = d * c; h *= del; if (Math.abs(del - 1) < 1e-15) break; }
+  return Math.exp(lpre) * h;
+};
+S.chi2Upper = (x, df) => S.gammaQ(df / 2, x / 2);
+S.betacf = (a, b, x) => {
+  const FP = 1e-300, qab = a + b, qap = a + 1, qam = a - 1;
+  let c = 1, d = 1 - qab * x / qap; if (Math.abs(d) < FP) d = FP; d = 1 / d; let h = d;
+  for (let m = 1; m <= 1000; m++) {
+    const m2 = 2 * m;
+    let aa = m * (b - m) * x / ((qam + m2) * (a + m2));
+    d = 1 + aa * d; if (Math.abs(d) < FP) d = FP; c = 1 + aa / c; if (Math.abs(c) < FP) c = FP; d = 1 / d; h *= d * c;
+    aa = -(a + m) * (qab + m) * x / ((a + m2) * (qap + m2));
+    d = 1 + aa * d; if (Math.abs(d) < FP) d = FP; c = 1 + aa / c; if (Math.abs(c) < FP) c = FP; d = 1 / d;
+    const del = d * c; h *= del; if (Math.abs(del - 1) < 1e-15) break;
+  }
+  return h;
+};
+S.ibeta = (x, a, b) => {
+  if (x <= 0) return 0; if (x >= 1) return 1;
+  const bt = Math.exp(S.lnGamma(a + b) - S.lnGamma(a) - S.lnGamma(b) + a * Math.log(x) + b * Math.log(1 - x));
+  return x < (a + 1) / (a + b + 2) ? bt * S.betacf(a, b, x) / a : 1 - bt * S.betacf(b, a, 1 - x) / b;
+};
+S.fUpper = (F, d1, d2) => { if (!Number.isFinite(F)) return 0; if (F <= 0) return 1; return S.ibeta(d2 / (d2 + d1 * F), d2 / 2, d1 / 2); };
+
+// ---------- PCA ----------
+S.pca = (X, useCorr) => {
+  const n = X.length, p = X[0].length;
+  const desc = S.descStats(X);
+  const means = desc.map(d => d.mean), sds = desc.map(d => d.sd);
+  const Z = useCorr ? S.standardize(X, means, sds) : X.map(r => r.map((v, j) => v - means[j]));
+  const C = S.crossProd(Z, n - 1);
+  const eig = S.jacobi(C);
+  const values = eig.values.map(v => Math.max(v, 0));
+  const total = values.reduce((s, v) => s + v, 0);
+  const pct = values.map(v => v / total * 100);
+  let cum = 0; const cumPct = pct.map(v => (cum += v));
+  // loadings as correlation between variable j and component k
+  const loadings = Array.from({ length: p }, (_, j) => eig.vectors.map((vec, k) => vec[j] * Math.sqrt(values[k]) / (useCorr ? 1 : sds[j])));
+  const scores = Z.map(r => eig.vectors.map(vec => { let s = 0; for (let j = 0; j < p; j++) s += r[j] * vec[j]; return s; }));
+  return { values, pct, cumPct, vectors: eig.vectors, loadings, scores, means, sds, C };
+};
+
+S.bartlettKMO = (R, n) => {
+  const p = R.length;
+  const ev = S.jacobi(R).values;
+  const det = ev.reduce((s, v) => s * Math.max(v, 0), 1);
+  const out = { det, chi2: NaN, df: p * (p - 1) / 2, pval: NaN, kmo: NaN, msa: new Array(p).fill(NaN) };
+  if (det > 1e-300) {
+    out.chi2 = -((n - 1) - (2 * p + 5) / 6) * Math.log(det);
+    out.pval = S.chi2Upper(out.chi2, out.df);
+  }
+  const Ri = S.inverse(R);
+  if (Ri) {
+    let sr = 0, sp = 0; const rj = new Array(p).fill(0), pj = new Array(p).fill(0);
+    for (let i = 0; i < p; i++) for (let j = 0; j < p; j++) {
+      if (i === j) continue;
+      const r2 = R[i][j] ** 2, pc2 = (Ri[i][j] / Math.sqrt(Ri[i][i] * Ri[j][j])) ** 2;
+      sr += r2; sp += pc2; rj[i] += r2; pj[i] += pc2;
+    }
+    out.kmo = sr / (sr + sp);
+    out.msa = rj.map((v, i) => v / (v + pj[i]));
+  }
+  return out;
+};
+
+// ---------- K-Means ----------
+S.kmeans = (X, k, { nInit = 10, maxIter = 300, seed = 42 } = {}) => {
+  const n = X.length, p = X[0].length, rnd = S.rng(seed);
+  let best = null;
+  for (let t = 0; t < nInit; t++) {
+    const C = [X[Math.floor(rnd() * n)].slice()];
+    const D = new Float64Array(n).fill(Infinity);
+    while (C.length < k) {
+      const last = C[C.length - 1]; let sum = 0;
+      for (let i = 0; i < n; i++) { const d = S.dist2(X[i], last); if (d < D[i]) D[i] = d; sum += D[i]; }
+      let idx = Math.floor(rnd() * n);
+      if (sum > 0) { let r = rnd() * sum; for (let i = 0; i < n; i++) { r -= D[i]; if (r <= 0) { idx = i; break; } } }
+      C.push(X[idx].slice());
+    }
+    const L = new Int32Array(n).fill(-1); let it = 0;
+    for (it = 0; it < maxIter; it++) {
+      let changed = false;
+      for (let i = 0; i < n; i++) {
+        let bc = 0, bd = Infinity;
+        for (let c = 0; c < k; c++) { const d = S.dist2(X[i], C[c]); if (d < bd) { bd = d; bc = c; } }
+        if (L[i] !== bc) { L[i] = bc; changed = true; }
+      }
+      if (!changed) break;
+      const sums = Array.from({ length: k }, () => new Float64Array(p)), cnt = new Int32Array(k);
+      for (let i = 0; i < n; i++) { cnt[L[i]]++; const s = sums[L[i]]; for (let j = 0; j < p; j++) s[j] += X[i][j]; }
+      for (let c = 0; c < k; c++) {
+        if (cnt[c] === 0) { // empty cluster -> farthest point
+          let fi = 0, fd = -1; for (let i = 0; i < n; i++) { const d = S.dist2(X[i], C[L[i]]); if (d > fd) { fd = d; fi = i; } }
+          C[c] = X[fi].slice(); L[fi] = c;
+        } else C[c] = Array.from(sums[c], v => v / cnt[c]);
+      }
+    }
+    let wss = 0; for (let i = 0; i < n; i++) wss += S.dist2(X[i], C[L[i]]);
+    if (!best || wss < best.wss - 1e-12) best = { labels: Array.from(L), centers: C.map(c => c.slice()), wss, iter: it + 1 };
+  }
+  return S.relabel(best.labels, k, best);
+};
+
+// relabel clusters so cluster 0 is the largest
+S.relabel = (labels, k, extra = {}) => {
+  const cnt = new Array(k).fill(0); labels.forEach(l => cnt[l]++);
+  const order = [...Array(k).keys()].sort((a, b) => cnt[b] - cnt[a] || a - b);
+  const map = new Array(k); order.forEach((old, nw) => (map[old] = nw));
+  const res = Object.assign({}, extra, { labels: labels.map(l => map[l]) });
+  if (extra.centers) res.centers = order.map(o => extra.centers[o]);
+  return res;
+};
+
+S.silhouette = (X, labels, k, maxN = 2000, seed = 7) => {
+  const n = X.length; let idx = [...Array(n).keys()], sampled = false;
+  if (n > maxN) { const r = S.rng(seed); for (let i = n - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [idx[i], idx[j]] = [idx[j], idx[i]]; } idx = idx.slice(0, maxN); sampled = true; }
+  const cnt = new Array(k).fill(0); idx.forEach(i => cnt[labels[i]]++);
+  const vals = new Array(n).fill(NaN); let tot = 0;
+  for (const i of idx) {
+    const sums = new Array(k).fill(0);
+    for (const j of idx) if (j !== i) sums[labels[j]] += Math.sqrt(S.dist2(X[i], X[j]));
+    const own = labels[i]; let s = 0;
+    if (cnt[own] > 1) {
+      const a = sums[own] / (cnt[own] - 1); let b = Infinity;
+      for (let c = 0; c < k; c++) if (c !== own && cnt[c] > 0) b = Math.min(b, sums[c] / cnt[c]);
+      s = Number.isFinite(b) && Math.max(a, b) > 0 ? (b - a) / Math.max(a, b) : 0;
+    }
+    vals[i] = s; tot += s;
+  }
+  return { avg: tot / idx.length, values: vals, sampled };
+};
+
+S.clusterMetrics = (Z, lab, k) => {
+  const n = Z.length, p = Z[0].length;
+  const centers = Array.from({ length: k }, () => new Array(p).fill(0)), cnt = new Array(k).fill(0);
+  Z.forEach((r, i) => { cnt[lab[i]]++; r.forEach((v, j) => (centers[lab[i]][j] += v)); });
+  centers.forEach((c, ci) => c.forEach((_, j) => (c[j] /= cnt[ci] || 1)));
+  const grand = new Array(p).fill(0); Z.forEach(r => r.forEach((v, j) => (grand[j] += v / n)));
+  let TSS = 0, WSS = 0; const dist = new Array(n), sAvg = new Array(k).fill(0);
+  Z.forEach((r, i) => { TSS += S.dist2(r, grand); const d = S.dist2(r, centers[lab[i]]); WSS += d; dist[i] = Math.sqrt(d); sAvg[lab[i]] += dist[i]; });
+  sAvg.forEach((v, c) => (sAvg[c] = v / (cnt[c] || 1)));
+  const BSS = TSS - WSS;
+  const CH = k > 1 && n > k ? (BSS / (k - 1)) / (WSS / (n - k)) : NaN;
+  let DB = 0;
+  for (let i = 0; i < k; i++) { let m = 0; for (let j = 0; j < k; j++) if (i !== j) { const d = Math.sqrt(S.dist2(centers[i], centers[j])); if (d > 0) m = Math.max(m, (sAvg[i] + sAvg[j]) / d); } DB += m / k; }
+  return { centers, cnt, TSS, WSS, BSS, CH, DB, dist, sAvg };
+};
+
+S.anova = (X, lab, k) => {
+  const n = X.length, p = X[0].length, out = [];
+  for (let j = 0; j < p; j++) {
+    const gm = new Array(k).fill(0), cnt = new Array(k).fill(0); let grand = 0;
+    X.forEach((r, i) => { gm[lab[i]] += r[j]; cnt[lab[i]]++; grand += r[j]; });
+    grand /= n; gm.forEach((v, c) => (gm[c] = v / (cnt[c] || 1)));
+    let ssb = 0, ssw = 0;
+    gm.forEach((m, c) => (ssb += cnt[c] * (m - grand) ** 2));
+    X.forEach((r, i) => (ssw += (r[j] - gm[lab[i]]) ** 2));
+    const df1 = k - 1, df2 = n - k;
+    const F = ssw > 0 ? (ssb / df1) / (ssw / df2) : Infinity;
+    out.push({ ssb, ssw, df1, df2, F, p: S.fUpper(F, df1, df2), eta2: ssb + ssw > 0 ? ssb / (ssb + ssw) : 0 });
+  }
+  return out;
+};
+
+// ---------- Hierarchical ----------
+S.hclust = (X, method) => {
+  const n = X.length, D = new Float64Array(n * n);
+  for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) { let d = S.dist2(X[i], X[j]); if (method !== 'ward') d = Math.sqrt(d); D[i * n + j] = D[j * n + i] = d; }
+  const active = new Uint8Array(n).fill(1), size = new Int32Array(n).fill(1), id = Int32Array.from({ length: n }, (_, i) => i);
+  // nearest-neighbour cache
+  const nn = new Int32Array(n).fill(-1), nnd = new Float64Array(n).fill(Infinity);
+  const updNN = i => { let b = -1, bd = Infinity; for (let j = 0; j < n; j++) if (j !== i && active[j] && D[i * n + j] < bd) { bd = D[i * n + j]; b = j; } nn[i] = b; nnd[i] = bd; };
+  for (let i = 0; i < n; i++) updNN(i);
+  const merges = [];
+  for (let step = 0; step < n - 1; step++) {
+    let a = -1, bd = Infinity;
+    for (let i = 0; i < n; i++) if (active[i] && nnd[i] < bd) { bd = nnd[i]; a = i; }
+    let b = nn[a]; if (b < a) [a, b] = [b, a];
+    const h = method === 'ward' ? Math.sqrt(bd) : bd;
+    const na = size[a], nb = size[b];
+    merges.push([id[a], id[b], h, na + nb]);
+    for (let k = 0; k < n; k++) {
+      if (!active[k] || k === a || k === b) continue;
+      const dka = D[k * n + a], dkb = D[k * n + b], nk = size[k]; let d;
+      if (method === 'ward') d = ((na + nk) * dka + (nb + nk) * dkb - nk * bd) / (na + nb + nk);
+      else if (method === 'single') d = Math.min(dka, dkb);
+      else if (method === 'complete') d = Math.max(dka, dkb);
+      else d = (na * dka + nb * dkb) / (na + nb);
+      D[k * n + a] = D[a * n + k] = d;
+    }
+    active[b] = 0; size[a] = na + nb; id[a] = n + step; nnd[b] = Infinity;
+    for (let k = 0; k < n; k++) {
+      if (!active[k]) continue;
+      if (k === a || nn[k] === a || nn[k] === b) updNN(k);
+      else if (D[k * n + a] < nnd[k]) { nnd[k] = D[k * n + a]; nn[k] = a; }
+    }
+  }
+  return { merges, n };
+};
+
+S.cutTree = (merges, n, k) => {
+  const parent = Int32Array.from({ length: n }, (_, i) => i);
+  const find = x => { while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x]; } return x; };
+  const rep = new Int32Array(2 * n - 1); for (let i = 0; i < n; i++) rep[i] = i;
+  for (let s = 0; s < n - k; s++) { const [a, b] = merges[s]; const ra = find(rep[a]), rb = find(rep[b]); parent[rb] = ra; rep[n + s] = ra; }
+  const map = new Map(); const lab = new Array(n);
+  for (let i = 0; i < n; i++) { const r = find(i); if (!map.has(r)) map.set(r, map.size); lab[i] = map.get(r); }
+  return S.relabel(lab, k).labels;
+};
+// ==CORE END==
+</script>
+
+<script>
+// ================= UI =================
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const PALETTE = ['#2f5bea', '#e4572e', '#17a398', '#f3a712', '#8e44ad', '#29335c', '#db2b7a', '#4caf50', '#795548', '#00acc1'];
+const color = i => i < PALETTE.length ? PALETTE[i] : `hsl(${(i * 137.5) % 360},65%,48%)`;
+const alpha = (hex, a) => { if (hex.startsWith('hsl')) return hex.replace('hsl', 'hsla').replace(')', `,${a})`); const n = parseInt(hex.slice(1), 16); return `rgba(${n >> 16},${(n >> 8) & 255},${n & 255},${a})`; };
+
+const HINTS = {
+  kmeans: 'แบ่งข้อมูลออกเป็น k กลุ่ม โดยให้แต่ละหน่วยอยู่ใกล้จุดศูนย์กลางกลุ่มมากที่สุด เหมาะกับข้อมูลจำนวนมาก ระบบช่วยหาค่า k ที่เหมาะสมด้วย Elbow และ Silhouette',
+  hclust: 'รวมข้อมูลที่คล้ายกันทีละคู่เป็นลำดับชั้นและแสดงเป็น Dendrogram แล้วตัดแบ่งเป็น k กลุ่ม เหมาะกับข้อมูลไม่เกิน 1,500 แถว',
+  pca: 'ลดมิติข้อมูลหลายตัวแปรให้เหลือองค์ประกอบหลักไม่กี่ตัวที่อธิบายความแปรปรวนได้มากที่สุด พร้อมทดสอบ KMO และ Bartlett'
+};
+const METHOD_NAMES = { kmeans: 'K-Means Cluster Analysis', hclust: 'Hierarchical Cluster Analysis', pca: 'Principal Component Analysis (PCA)' };
+const LINK_NAMES = { ward: 'Ward', complete: 'Complete linkage', average: 'Average linkage', single: 'Single linkage' };
+
+let state = freshState();
+function freshState() { return { wb: null, fileName: '', headers: [], rows: [], numeric: [], charts: [], tables: [], redraws: [] }; }
+
+Chart.defaults.font.family = "'Sarabun', sans-serif";
+Chart.defaults.font.size = 13;
+Chart.defaults.color = '#3b4357';
+Chart.register({
+  id: 'whiteBg',
+  beforeDraw(c) { const x = c.ctx; x.save(); x.globalCompositeOperation = 'destination-over'; x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height); x.restore(); }
+});
+Chart.register({
+  id: 'vecLabel',
+  afterDatasetsDraw(chart) {
+    const ctx = chart.ctx, x0 = chart.scales.x.getPixelForValue(0);
+    chart.data.datasets.forEach((ds, i) => {
+      if (!ds.vecLabel) return; const meta = chart.getDatasetMeta(i); if (meta.hidden) return;
+      const pt = meta.data[1]; if (!pt) return;
+      ctx.save(); ctx.fillStyle = ds.borderColor; ctx.font = "600 12px 'Sarabun', sans-serif";
+      const right = pt.x >= x0; ctx.textAlign = right ? 'left' : 'right';
+      ctx.fillText(ds.vecLabel, pt.x + (right ? 5 : -5), pt.y - 4); ctx.restore();
+    });
+  }
+});
+
+// ---------- formatting ----------
+function fmt(v, d = 4) {
+  if (v === null || v === undefined || v === '') return '-';
+  if (typeof v !== 'number') return esc(v);
+  if (!Number.isFinite(v)) return v === Infinity ? '∞' : '-';
+  if (Number.isInteger(v)) return v.toLocaleString('en-US');
+  const a = Math.abs(v);
+  if (a !== 0 && (a < 1e-4 || a >= 1e10)) return v.toExponential(3);
+  return v.toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d });
+}
+const fmtP = p => !Number.isFinite(p) ? '-' : p < 0.001 ? '< 0.001' : p.toFixed(3);
+const f2 = v => fmt(v, 2), f3 = v => fmt(v, 3);
+const pctS = v => (Number.isFinite(v) ? v.toFixed(2) : '-') + '%';
+
+function toNum(v) {
+  if (v === null || v === undefined || v === '' || typeof v === 'boolean') return NaN;
+  if (typeof v === 'number') return v;
+  if (v instanceof Date) return NaN;
+  const s = String(v).trim().replace(/,/g, '');
+  return /^[-+]?(\d+\.?\d*|\.\d+)([eE][-+]?\d+)?$/.test(s) ? parseFloat(s) : NaN;
+}
+
+// ---------- messages ----------
+function showMsg(html, type = 'info') { $('#msg').innerHTML = html ? `<div class="msg ${type}">${html}</div>` : ''; }
+const loading = on => $('#loading').classList.toggle('hidden', !on);
+
+// ---------- method & options ----------
+function syncMethod() {
+  const m = $('#method').value;
+  $('#methodHint').textContent = HINTS[m];
+  document.querySelectorAll('.opt[data-for]').forEach(el => el.classList.toggle('hidden', !el.dataset.for.split(' ').includes(m)));
+  $('#stdText').textContent = m === 'pca' ? 'ใช้เมทริกซ์สหสัมพันธ์ (ปรับมาตรฐานตัวแปร) — แนะนำเมื่อหน่วยวัดต่างกัน' : 'ปรับมาตรฐานข้อมูล (Z-score) ก่อนวิเคราะห์ — แนะนำเมื่อหน่วยวัดต่างกัน';
+}
+$('#method').addEventListener('change', syncMethod);
+$('#optKMode').addEventListener('change', e => ($('#optK').disabled = e.target.value !== 'manual'));
+$('#optPcMode').addEventListener('change', e => ($('#optPc').disabled = e.target.value !== 'manual'));
+
+// ---------- file handling ----------
+const fileInput = $('#fileInput'), dz = $('#dropzone');
+fileInput.addEventListener('change', e => e.target.files[0] && readFile(e.target.files[0]));
+['dragenter', 'dragover'].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.add('drag'); }));
+['dragleave', 'drop'].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.remove('drag'); }));
+dz.addEventListener('drop', e => { const f = e.dataTransfer.files[0]; if (f) readFile(f); });
+
+function readFile(file) {
+  if (!/\.(xlsx|xls|csv)$/i.test(file.name)) { showMsg('รองรับเฉพาะไฟล์ .xlsx, .xls หรือ .csv', 'error'); return; }
+  const fr = new FileReader();
+  fr.onload = e => {
+    try {
+      const wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
+      setWorkbook(wb, file.name);
+    } catch (err) { showMsg('ไม่สามารถอ่านไฟล์ได้: ' + esc(err.message), 'error'); }
+  };
+  fr.readAsArrayBuffer(file);
+}
+
+function setWorkbook(wb, name) {
+  state.wb = wb; state.fileName = name;
+  $('#fileName').innerHTML = `✅ <b>${esc(name)}</b><br><small>คลิกเพื่อเปลี่ยนไฟล์</small>`;
+  $('#sheetSel').innerHTML = wb.SheetNames.map(s => `<option>${esc(s)}</option>`).join('');
+  loadSheet(wb.SheetNames[0]);
+}
+$('#sheetSel').addEventListener('change', e => loadSheet(e.target.value));
+
+function loadSheet(name) {
+  const ws = state.wb.Sheets[name];
+  let aoa = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null, raw: true, blankrows: false });
+  aoa = aoa.filter(r => r && r.some(v => v !== null && String(v).trim() !== ''));
+  if (aoa.length < 2) { $('#dataSetup').classList.remove('hidden'); $('#colList').innerHTML = ''; $('#previewBox').innerHTML = ''; showMsg('ชีตนี้ไม่มีข้อมูลเพียงพอ (ต้องมีแถวหัวคอลัมน์และข้อมูลอย่างน้อย 1 แถว)', 'error'); return; }
+  const width = Math.max(...aoa.map(r => r.length));
+  const seen = {};
+  state.headers = Array.from({ length: width }, (_, j) => {
+    let h = aoa[0][j]; h = h === null || h === undefined || String(h).trim() === '' ? `คอลัมน์ ${j + 1}` : String(h).trim();
+    if (seen[h]) { seen[h]++; h = `${h} (${seen[h]})`; } else seen[h] = 1;
+    return h;
+  });
+  state.rows = aoa.slice(1).map(r => Array.from({ length: width }, (_, j) => (r[j] === undefined ? null : r[j])));
+  state.numeric = state.headers.map((_, j) => {
+    let ne = 0, num = 0;
+    state.rows.forEach(r => { const v = r[j]; if (v !== null && String(v).trim() !== '') { ne++; if (Number.isFinite(toNum(v))) num++; } });
+    return num >= 3 && num / Math.max(ne, 1) >= 0.8;
+  });
+  renderSetup();
+  showMsg(`โหลดข้อมูลสำเร็จ: ${state.rows.length.toLocaleString()} แถว, ${width} คอลัมน์ (พบคอลัมน์ตัวเลข ${state.numeric.filter(Boolean).length} คอลัมน์)`, 'info');
+}
+
+function renderSetup() {
+  $('#dataSetup').classList.remove('hidden');
+  const { headers, numeric, rows } = state;
+  $('#colList').innerHTML = headers.map((h, j) => `<label class="chip ${numeric[j] ? '' : 'disabled'}" title="${numeric[j] ? '' : 'คอลัมน์นี้ไม่ใช่ตัวเลข'}"><input type="checkbox" value="${j}" ${numeric[j] ? 'checked' : 'disabled'}> ${esc(h)} <small>${numeric[j] ? 'ตัวเลข' : 'ข้อความ'}</small></label>`).join('');
+  const firstText = numeric.findIndex(v => !v);
+  $('#labelCol').innerHTML = `<option value="">— ไม่ใช้ (ใช้เลขแถวแทน) —</option>` + headers.map((h, j) => `<option value="${j}" ${j === firstText ? 'selected' : ''}>${esc(h)}</option>`).join('');
+  const prev = rows.slice(0, 5);
+  $('#previewBox').innerHTML = `<table class="data"><thead><tr>${headers.map(h => `<th>${esc(h)}</th>`).join('')}</tr></thead><tbody>${prev.map(r => `<tr>${r.map(v => `<td class="${typeof v === 'number' ? 'num' : ''}">${v === null ? '' : typeof v === 'number' ? fmt(v, 2) : esc(v)}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+  $('#rowInfo').textContent = `— ทั้งหมด ${rows.length.toLocaleString()} แถว`;
+  updateColCount();
+}
+$('#colList').addEventListener('change', updateColCount);
+function updateColCount() { $('#colCount').textContent = `(เลือก ${document.querySelectorAll('#colList input:checked').length} ตัวแปร)`; }
+$('#btnAllCols').onclick = () => { document.querySelectorAll('#colList input:not(:disabled)').forEach(i => (i.checked = true)); updateColCount(); };
+$('#btnNoCols').onclick = () => { document.querySelectorAll('#colList input').forEach(i => (i.checked = false)); updateColCount(); };
+
+// ---------- sample data ----------
+function makeSample() {
+  const rnd = S.rng(2026);
+  const g = () => { let u = 0; while (!u) u = rnd(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * rnd()); };
+  const groups = [
+    { n: 50, age: [28, 4], inc: [22000, 3500], freq: [9, 2], spend: [650, 150], sat: [7.8, 0.8] },
+    { n: 55, age: [42, 5], inc: [48000, 6000], freq: [4, 1.2], spend: [2400, 400], sat: [8.2, 0.7] },
+    { n: 45, age: [58, 6], inc: [31000, 5000], freq: [2, 0.8], spend: [1100, 250], sat: [5.9, 1.0] }
+  ];
+  const rows = [];
+  groups.forEach(G => { for (let i = 0; i < G.n; i++) rows.push([
+    Math.round(G.age[0] + G.age[1] * g()), Math.round((G.inc[0] + G.inc[1] * g()) / 100) * 100,
+    Math.max(0, Math.round(G.freq[0] + G.freq[1] * g())), Math.round(G.spend[0] + G.spend[1] * g()),
+    Math.min(10, Math.max(1, +(G.sat[0] + G.sat[1] * g()).toFixed(1)))]); });
+  for (let i = rows.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [rows[i], rows[j]] = [rows[j], rows[i]]; }
+  return [['รหัสลูกค้า', 'อายุ', 'รายได้ต่อเดือน', 'ความถี่ซื้อต่อเดือน', 'ยอดซื้อเฉลี่ยต่อครั้ง', 'คะแนนความพึงพอใจ'],
+    ...rows.map((r, i) => ['C' + String(i + 1).padStart(3, '0'), ...r])];
+}
+function sampleWorkbook() { const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(makeSample()), 'ข้อมูลลูกค้า'); return wb; }
+$('#btnSample').onclick = () => { fileInput.value = ''; setWorkbook(sampleWorkbook(), 'ข้อมูลตัวอย่าง (ลูกค้า 150 ราย)'); };
+$('#btnSampleDl').onclick = () => XLSX.writeFile(sampleWorkbook(), 'ตัวอย่างข้อมูล_cluster_pca.xlsx');
+
+// ---------- output helpers ----------
+const safeName = s => String(s).replace(/[\\/:*?"<>|\[\]]/g, '_').trim();
+function downloadCanvas(canvas, name) { const a = document.createElement('a'); a.href = canvas.toDataURL('image/png'); a.download = safeName(name) + '.png'; document.body.appendChild(a); a.click(); a.remove(); }
+function sheetName(name, used) { let s = safeName(name).slice(0, 31) || 'Sheet'; let base = s, i = 2; while (used.has(s)) { const suf = ` (${i++})`; s = base.slice(0, 31 - suf.length) + suf; } used.add(s); return s; }
+function tableToSheet(t) { return XLSX.utils.aoa_to_sheet([t.headers, ...t.rows.map(r => r.map(v => (typeof v === 'number' && !Number.isFinite(v) ? null : v)))]); }
+function downloadTable(t) { const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, tableToSheet(t), sheetName(t.sheet || t.title, new Set())); XLSX.writeFile(wb, safeName(t.title) + '.xlsx'); }
+$('#btnAllXlsx').onclick = () => {
+  if (!state.tables.length) return;
+  const wb = XLSX.utils.book_new(), used = new Set();
+  state.tables.forEach(t => XLSX.utils.book_append_sheet(wb, tableToSheet(t), sheetName(t.sheet || t.title, used)));
+  XLSX.writeFile(wb, safeName('ผลวิเคราะห์_' + METHOD_NAMES[state.lastMethod]) + '.xlsx');
+};
+
+function addStat(k, v, s = '') { $('#statCards').insertAdjacentHTML('beforeend', `<div class="stat"><div class="k">${esc(k)}</div><div class="v">${v}</div>${s ? `<div class="s">${s}</div>` : ''}</div>`); }
+
+function addTable(title, headers, rows, { sheet, pCols = [], dec = {}, hl = null, maxShow = 200, note = '' } = {}) {
+  const t = { title, sheet, headers, rows }; state.tables.push(t);
+  const card = document.createElement('div'); card.className = 'table-card';
+  const shown = rows.slice(0, maxShow);
+  const cell = (v, c, r) => {
+    const cls = typeof v === 'number' ? 'num' : '';
+    const txt = pCols.includes(c) && typeof v === 'number' ? fmtP(v) : (typeof v === 'number' ? fmt(v, dec[c] ?? 4) : (v === null || v === undefined ? '-' : esc(v)));
+    return `<td class="${cls}${hl && hl(r, c, v) ? ' hl' : ''}">${txt}</td>`;
+  };
+  card.innerHTML = `<div class="t-head"><h3>${esc(title)}</h3><button class="btn ghost small" type="button">⬇ Excel</button></div>
+    <div class="tbl-wrap"><table class="data"><thead><tr>${headers.map(h => `<th>${esc(h)}</th>`).join('')}</tr></thead>
+    <tbody>${shown.map((r, ri) => `<tr>${r.map((v, c) => cell(v, c, ri)).join('')}</tr>`).join('')}</tbody></table></div>
+    ${rows.length > maxShow ? `<p class="hint">แสดง ${maxShow} จาก ${rows.length.toLocaleString()} แถว — ดาวน์โหลด Excel เพื่อดูข้อมูลครบทุกแถว</p>` : ''}
+    ${note ? `<p class="hint">${note}</p>` : ''}`;
+  card.querySelector('button').onclick = () => downloadTable(t);
+  $('#tables').appendChild(card);
+}
+
+function addChart(title, config, { wide = false, desc = '' } = {}) {
+  const box = document.createElement('div'); box.className = 'chart-card' + (wide ? ' wide' : '');
+  box.innerHTML = `<div class="chart-head"><button class="btn ghost small" type="button">⬇ PNG</button></div><div class="chart-box"><canvas></canvas></div>${desc ? `<p class="hint">${desc}</p>` : ''}`;
+  $('#charts').appendChild(box);
+  const canvas = box.querySelector('canvas');
+  const o = config.options = config.options || {};
+  Object.assign(o, { responsive: true, maintainAspectRatio: false, devicePixelRatio: 2, animation: false });
+  o.plugins = Object.assign({ title: { display: true, text: title, font: { size: 15, family: 'Prompt', weight: '600' }, color: '#1d2433', padding: { bottom: 12 } } }, o.plugins || {});
+  state.charts.push(new Chart(canvas, config));
+  box.querySelector('button').onclick = () => downloadCanvas(canvas, title);
+}
+
+function addCustomChart(title, draw, { wide = true, desc = '', height } = {}) {
+  const box = document.createElement('div'); box.className = 'chart-card' + (wide ? ' wide' : '');
+  box.innerHTML = `<div class="chart-head"><button class="btn ghost small" type="button">⬇ PNG</button></div><div class="chart-box"${height ? ` style="height:${height}px"` : ''}><canvas></canvas></div>${desc ? `<p class="hint">${desc}</p>` : ''}`;
+  $('#charts').appendChild(box);
+  const canvas = box.querySelector('canvas');
+  const redraw = () => draw(canvas, title); redraw(); state.redraws.push(redraw);
+  box.querySelector('button').onclick = () => downloadCanvas(canvas, title);
+}
+let rsT; window.addEventListener('resize', () => { clearTimeout(rsT); rsT = setTimeout(() => state.redraws.forEach(f => f()), 200); });
+
+const axis = (title, extra = {}) => Object.assign({ title: { display: true, text: title, font: { weight: '600' } }, grid: { color: '#eef0f5' } }, extra);
+const pointTip = { callbacks: { label: c => `${c.raw.label ?? ''} (${fmt(c.raw.x, 2)}, ${fmt(c.raw.y, 2)})` } };
+
+function clearResults() {
+  state.charts.forEach(c => c.destroy()); state.charts = []; state.tables = []; state.redraws = [];
+  ['#statCards', '#interp', '#charts', '#tables'].forEach(s => ($(s).innerHTML = ''));
+}
+
+// ---------- interpretation helpers ----------
+function silLevel(s) {
+  if (s > 0.70) return 'โครงสร้างกลุ่มชัดเจนมาก (strong)';
+  if (s > 0.50) return 'โครงสร้างกลุ่มสมเหตุสมผล (reasonable)';
+  if (s > 0.25) return 'โครงสร้างกลุ่มค่อนข้างอ่อน (weak) กลุ่มอาจซ้อนทับกันบางส่วน';
+  return 'ไม่พบโครงสร้างกลุ่มที่ชัดเจน (no substantial structure)';
+}
+function kmoLevel(k) {
+  if (!Number.isFinite(k)) return 'คำนวณไม่ได้ (เมทริกซ์สหสัมพันธ์เป็นเอกฐาน)';
+  if (k >= 0.9) return 'ดีเยี่ยม (marvelous)'; if (k >= 0.8) return 'ดีมาก (meritorious)'; if (k >= 0.7) return 'ดี (middling)';
+  if (k >= 0.6) return 'พอใช้ (mediocre)'; if (k >= 0.5) return 'ต่ำ (miserable)'; return 'ไม่เหมาะสม (unacceptable)';
+}
+
+// ---------- run ----------
+$('#btnRun').onclick = () => {
+  showMsg('');
+  if (!state.rows.length) { showMsg('กรุณาแนบไฟล์ Excel หรือกด “ใช้ข้อมูลตัวอย่าง” ก่อน', 'error'); return; }
+  const method = $('#method').value;
+  const cols = [...document.querySelectorAll('#colList input:checked')].map(i => +i.value);
+  if (method === 'pca' && cols.length < 2) { showMsg('PCA ต้องเลือกตัวแปรตัวเลขอย่างน้อย 2 ตัว', 'error'); return; }
+  if (cols.length < 1) { showMsg('กรุณาเลือกตัวแปรอย่างน้อย 1 ตัว', 'error'); return; }
+  const lc = $('#labelCol').value;
+  const X = [], labels = []; let dropped = 0;
+  state.rows.forEach((r, i) => {
+    const v = cols.map(j => toNum(r[j]));
+    if (v.every(Number.isFinite)) { X.push(v); const lv = lc === '' ? null : r[+lc]; labels.push(lv === null || lv === undefined || lv === '' ? `แถว ${i + 2}` : String(lv)); }
+    else dropped++;
+  });
+  const names = cols.map(j => state.headers[j]);
+  if (X.length < 4) { showMsg('ข้อมูลที่สมบูรณ์มีน้อยเกินไป (ต้องมีอย่างน้อย 4 แถว)', 'error'); return; }
+  const desc = S.descStats(X);
+  const constant = names.filter((_, j) => !(desc[j].sd > 0));
+  if (constant.length) { showMsg(`ตัวแปรต่อไปนี้มีค่าคงที่ (SD = 0) กรุณาเอาออก: <b>${constant.map(esc).join(', ')}</b>`, 'error'); return; }
+  const opt = {
+    std: $('#optStd').checked, kMode: $('#optKMode').value, k: parseInt($('#optK').value, 10),
+    link: $('#optLink').value, pcMode: $('#optPcMode').value, pc: parseInt($('#optPc').value, 10)
+  };
+  if (method !== 'pca' && opt.kMode === 'manual' && !(opt.k >= 2 && opt.k < X.length)) { showMsg(`จำนวนกลุ่มต้องอยู่ระหว่าง 2 ถึง ${X.length - 1}`, 'error'); return; }
+  if (method === 'hclust' && X.length > 1500) { showMsg(`Hierarchical clustering รองรับไม่เกิน 1,500 แถว (ข้อมูลมี ${X.length.toLocaleString()} แถว) กรุณาใช้ K-Means แทน`, 'error'); return; }
+
+  loading(true);
+  setTimeout(() => {
+    try {
+      clearResults(); state.lastMethod = method;
+      const info = { n: X.length, p: cols.length, dropped, desc, names, labels };
+      $('#resTitle').textContent = '2. ผลการวิเคราะห์ — ' + METHOD_NAMES[method];
+      if (method === 'pca') runPCA(X, opt, info); else runCluster(method, X, opt, info);
+      $('#results').classList.remove('hidden');
+      if (dropped) showMsg(`ตัดแถวที่ข้อมูลไม่ครบหรือไม่ใช่ตัวเลขออก ${dropped.toLocaleString()} แถว — ใช้วิเคราะห์ ${X.length.toLocaleString()} แถว`, 'warn');
+      $('#results').scrollIntoView({ behavior: 'smooth' });
+    } catch (err) { console.error(err); showMsg('เกิดข้อผิดพลาดระหว่างวิเคราะห์: ' + esc(err.message), 'error'); }
+    finally { loading(false); }
+  }, 60);
+};
+
+function descTable(info) {
+  addTable('สถิติเชิงพรรณนา', ['ตัวแปร', 'N', 'Mean', 'SD', 'Min', 'Median', 'Max', 'Skewness'],
+    info.desc.map((d, j) => [info.names[j], d.n, d.mean, d.sd, d.min, d.median, d.max, d.skew]), { sheet: 'Descriptive' });
+}
+
+// ================= PCA =================
+function runPCA(X, opt, info) {
+  const { n, p, names, labels } = info;
+  const res = S.pca(X, opt.std);
+  const R = opt.std ? res.C : S.crossProd(S.standardize(X, res.means, res.sds), n - 1);
+  const bk = S.bartlettKMO(R, n);
+  const kaiserM = Math.max(1, res.values.filter(v => v > 1).length);
+  const m80 = res.cumPct.findIndex(c => c >= 80) + 1 || p;
+  let m = opt.pcMode === 'kaiser' ? kaiserM : opt.pcMode === 'var80' ? m80 : Math.min(Math.max(1, opt.pc || 1), p);
+  // with covariance PCA, Kaiser on raw eigenvalues is not meaningful: use mean eigenvalue
+  if (!opt.std && opt.pcMode === 'kaiser') { const avg = S.mean(res.values); m = Math.max(1, res.values.filter(v => v > avg).length); }
+  const mShow = Math.max(m, Math.min(2, p));
+  const PC = k => `PC${k + 1}`;
+  const comm = res.loadings.map(row => row.slice(0, m).reduce((s, l) => s + l * l, 0));
+
+  // stats cards
+  addStat('จำนวนข้อมูล (N)', n.toLocaleString(), info.dropped ? `ตัดออก ${info.dropped} แถว` : 'ไม่มีข้อมูลสูญหาย');
+  addStat('จำนวนตัวแปร', p);
+  addStat('KMO', Number.isFinite(bk.kmo) ? bk.kmo.toFixed(3) : '-', kmoLevel(bk.kmo));
+  addStat('Bartlett’s test', Number.isFinite(bk.pval) ? 'p ' + (bk.pval < 0.001 ? '< 0.001' : '= ' + bk.pval.toFixed(3)) : '-', Number.isFinite(bk.chi2) ? `χ² = ${f2(bk.chi2)}, df = ${bk.df}` : '');
+  addStat('องค์ประกอบที่เก็บไว้', m, opt.pcMode === 'kaiser' ? (opt.std ? 'เกณฑ์ Eigenvalue > 1' : 'Eigenvalue > ค่าเฉลี่ย') : opt.pcMode === 'var80' ? 'ความแปรปรวนสะสม ≥ 80%' : 'กำหนดเอง');
+  addStat('ความแปรปรวนสะสม', pctS(res.cumPct[m - 1]), `จาก ${m} องค์ประกอบแรก`);
+
+  // interpretation
+  const L = [];
+  L.push(`วิเคราะห์ข้อมูล <b>${n.toLocaleString()}</b> หน่วย จาก <b>${p}</b> ตัวแปร ด้วย PCA บน${opt.std ? 'เมทริกซ์สหสัมพันธ์ (ตัวแปรถูกปรับมาตรฐาน)' : 'เมทริกซ์ความแปรปรวนร่วม (ข้อมูลดิบ)'}`);
+  if (Number.isFinite(bk.kmo)) L.push(`<b>ความเหมาะสมของข้อมูล:</b> KMO = <b>${bk.kmo.toFixed(3)}</b> อยู่ในระดับ${kmoLevel(bk.kmo)} ${bk.kmo >= 0.6 ? 'ถือว่าเหมาะสมต่อการวิเคราะห์องค์ประกอบ' : 'ตัวแปรมีความสัมพันธ์ร่วมกันน้อย ผลการวิเคราะห์ควรตีความอย่างระมัดระวัง'}`);
+  if (Number.isFinite(bk.pval)) L.push(`<b>Bartlett’s test of sphericity:</b> χ² = ${f2(bk.chi2)}, df = ${bk.df}, p ${bk.pval < 0.001 ? '< 0.001' : '= ' + bk.pval.toFixed(3)} → ${bk.pval < 0.05 ? 'ปฏิเสธ H₀ แสดงว่าเมทริกซ์สหสัมพันธ์ไม่ใช่เมทริกซ์เอกลักษณ์ ตัวแปรมีความสัมพันธ์กันมากพอที่จะลดมิติได้' : 'ไม่สามารถปฏิเสธ H₀ ตัวแปรอาจไม่สัมพันธ์กันมากพอสำหรับ PCA'}`);
+  else L.push('<b>Bartlett’s test:</b> คำนวณไม่ได้ เนื่องจากดีเทอร์มิแนนต์ของเมทริกซ์สหสัมพันธ์เป็นศูนย์ (มีตัวแปรที่เป็นผลรวมเชิงเส้นของตัวแปรอื่น)');
+  L.push(`<b>ความแปรปรวนที่อธิบายได้:</b> PC1 อธิบายได้ ${pctS(res.pct[0])} (Eigenvalue = ${f3(res.values[0])})${p > 1 ? `, PC2 อธิบายได้ ${pctS(res.pct[1])} (Eigenvalue = ${f3(res.values[1])}) รวมสององค์ประกอบแรก ${pctS(res.cumPct[1])}` : ''}`);
+  L.push(`<b>จำนวนองค์ประกอบ:</b> ${opt.std ? `เกณฑ์ Kaiser (Eigenvalue > 1) แนะนำ ${kaiserM} องค์ประกอบ อธิบายสะสม ${pctS(res.cumPct[kaiserM - 1])}` : ''}${opt.std ? '; ' : ''}ต้องใช้ ${m80} องค์ประกอบจึงจะอธิบายได้ ≥ 80% — การวิเคราะห์นี้เก็บไว้ <b>${m}</b> องค์ประกอบ อธิบายสะสม <b>${pctS(res.cumPct[m - 1])}</b>`);
+  for (let k = 0; k < Math.min(m, 4); k++) {
+    const items = res.loadings.map((row, j) => ({ name: names[j], l: row[k] })).filter(o => Math.abs(o.l) >= 0.5).sort((a, b) => Math.abs(b.l) - Math.abs(a.l));
+    const pos = items.filter(o => o.l > 0).map(o => `${esc(o.name)} (${o.l.toFixed(2)})`), neg = items.filter(o => o.l < 0).map(o => `${esc(o.name)} (${o.l.toFixed(2)})`);
+    let t = `<b>${PC(k)}</b>: `;
+    if (!items.length) { const top = res.loadings.map((row, j) => ({ name: names[j], l: row[k] })).sort((a, b) => Math.abs(b.l) - Math.abs(a.l))[0]; t += `ไม่มีตัวแปรที่มี |loading| ≥ 0.50 ตัวแปรที่สัมพันธ์สูงสุดคือ ${esc(top.name)} (${top.l.toFixed(2)})`; }
+    else t += [pos.length ? `สัมพันธ์ทางบวกกับ ${pos.join(', ')}` : '', neg.length ? `สัมพันธ์ทางลบกับ ${neg.join(', ')}` : ''].filter(Boolean).join(' และ');
+    L.push(t);
+  }
+  const lowComm = names.filter((_, j) => comm[j] < 0.5);
+  L.push(lowComm.length ? `<b>Communality:</b> ตัวแปรที่องค์ประกอบ ${m} ตัวอธิบายได้น้อยกว่า 50% ได้แก่ ${lowComm.map(esc).join(', ')} อาจพิจารณาเพิ่มจำนวนองค์ประกอบหรือตัดตัวแปรออก` : `<b>Communality:</b> ทุกตัวแปรถูกอธิบายโดยองค์ประกอบที่เก็บไว้ได้อย่างน้อย 50% (ต่ำสุด ${(Math.min(...comm) * 100).toFixed(1)}%)`);
+  $('#interp').innerHTML = `<h3>📝 สรุปและการตีความผล</h3><ul>${L.map(x => `<li>${x}</li>`).join('')}</ul><p class="note">เกณฑ์อ้างอิง: KMO ≥ 0.60 ถือว่ายอมรับได้ (Kaiser, 1974) · Bartlett p &lt; 0.05 แสดงว่าตัวแปรสัมพันธ์กันเพียงพอ · Loading ≥ |0.50| ถือว่าตัวแปรมีน้ำหนักต่อองค์ประกอบในระดับสำคัญ · Loading ในตารางคือสหสัมพันธ์ระหว่างตัวแปรกับองค์ประกอบ</p>`;
+
+  // charts
+  const labs = res.values.map((_, k) => PC(k));
+  addChart('Scree Plot และความแปรปรวนสะสม', {
+    type: 'bar',
+    data: { labels: labs, datasets: [
+      { type: 'line', label: 'ความแปรปรวนสะสม (%)', data: res.cumPct, yAxisID: 'y1', borderColor: '#e4572e', backgroundColor: '#e4572e', tension: .2, pointRadius: 4 },
+      ...(opt.std ? [{ type: 'line', label: 'เกณฑ์ Kaiser (Eigenvalue = 1)', data: labs.map(() => 1), borderColor: '#888', borderDash: [6, 5], pointRadius: 0, borderWidth: 1.5 }] : []),
+      { label: 'Eigenvalue', data: res.values, backgroundColor: res.values.map((_, k) => k < m ? alpha('#2f5bea', .85) : alpha('#2f5bea', .3)), borderRadius: 4 }
+    ] },
+    options: { scales: { x: axis('องค์ประกอบหลัก'), y: axis('Eigenvalue', { beginAtZero: true }), y1: axis('ความแปรปรวนสะสม (%)', { position: 'right', min: 0, max: 100, grid: { display: false } }) } }
+  }, { desc: 'แท่งสีเข้มคือองค์ประกอบที่เก็บไว้ จุดที่กราฟเริ่มหักศอก (elbow) ช่วยบอกจำนวนองค์ประกอบที่เหมาะสม' });
+
+  if (p >= 2) {
+    const sc = res.scores, maxS = Math.max(...sc.map(r => Math.max(Math.abs(r[0]), Math.abs(r[1])))) || 1;
+    const maxL = Math.max(...res.loadings.map(l => Math.hypot(l[0], l[1]))) || 1, f = 0.85 * maxS / maxL;
+    addChart(`Biplot (PC1 ${res.pct[0].toFixed(1)}% vs PC2 ${res.pct[1].toFixed(1)}%)`, {
+      type: 'scatter',
+      data: { datasets: [
+        { label: 'คะแนนองค์ประกอบ (scores)', data: sc.map((r, i) => ({ x: r[0], y: r[1], label: labels[i] })), backgroundColor: alpha('#2f5bea', .55), pointRadius: n > 1000 ? 2 : 4 },
+        ...res.loadings.map((l, j) => ({ label: names[j], vecLabel: names[j], data: [{ x: 0, y: 0 }, { x: l[0] * f, y: l[1] * f, label: `${names[j]} loading (${l[0].toFixed(2)}, ${l[1].toFixed(2)})` }], showLine: true, borderColor: '#d1495b', backgroundColor: '#d1495b', pointRadius: [0, 3], borderWidth: 2 }))
+      ] },
+      options: { plugins: { legend: { labels: { filter: (it, d) => !d.datasets[it.datasetIndex].vecLabel } }, tooltip: { callbacks: { label: c => c.raw.label ?? '' } } },
+        scales: { x: axis(`PC1 (${res.pct[0].toFixed(1)}%)`), y: axis(`PC2 (${res.pct[1].toFixed(1)}%)`) } }
+    }, { wide: true, desc: 'จุดคือข้อมูลแต่ละหน่วย ลูกศรสีแดงคือทิศทางของตัวแปร — ลูกศรที่ชี้ไปทางเดียวกันแสดงว่าตัวแปรสัมพันธ์ทางบวก ลูกศรยาวแสดงว่าตัวแปรนั้นถูกอธิบายด้วย PC1–PC2 ได้ดี' });
+
+    addChart('Component Loadings', {
+      type: 'bar',
+      data: { labels: names, datasets: labs.slice(0, mShow).map((l, k) => ({ label: l, data: res.loadings.map(r => r[k]), backgroundColor: color(k), borderRadius: 3 })) },
+      options: { scales: { x: axis('ตัวแปร'), y: axis('Loading', { min: -1, max: 1 }) } }
+    }, { desc: 'ค่า loading ใกล้ ±1 แสดงว่าตัวแปรสัมพันธ์กับองค์ประกอบนั้นมาก' });
+  }
+  addChart('Communality ของแต่ละตัวแปร', {
+    type: 'bar',
+    data: { labels: names, datasets: [{ label: `Communality (${m} องค์ประกอบ)`, data: comm, backgroundColor: comm.map(c => c < 0.5 ? '#f3a712' : '#17a398'), borderRadius: 4 }] },
+    options: { indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: axis('สัดส่วนความแปรปรวนที่อธิบายได้', { min: 0, max: 1 }), y: axis('ตัวแปร') } }
+  }, { desc: 'แท่งสีส้ม = communality ต่ำกว่า 0.50 (ตัวแปรถูกอธิบายได้น้อย)' });
+
+  // tables
+  descTable(info);
+  addTable('เมทริกซ์สหสัมพันธ์ (Pearson)', ['ตัวแปร', ...names], R.map((r, i) => [names[i], ...r]), { sheet: 'Correlation', hl: (r, c, v) => c > 0 && c - 1 !== r && Math.abs(v) >= 0.5 , note: 'ช่องที่ไฮไลต์คือ |r| ≥ 0.50' });
+  addTable('การทดสอบความเหมาะสมของข้อมูล (KMO และ Bartlett)', ['สถิติ', 'ค่า'], [
+    ['Kaiser-Meyer-Olkin (KMO)', bk.kmo], ['การแปลผล KMO', kmoLevel(bk.kmo)], ['Determinant ของเมทริกซ์สหสัมพันธ์', bk.det],
+    ['Bartlett’s Chi-square (χ²)', bk.chi2], ['df', bk.df], ['p-value', bk.pval],
+    ...names.map((nm, j) => [`MSA — ${nm}`, bk.msa[j]])
+  ], { sheet: 'KMO_Bartlett', dec: { 1: 4 } });
+  addTable('Eigenvalues และความแปรปรวนที่อธิบายได้', ['องค์ประกอบ', 'Eigenvalue', '% ความแปรปรวน', '% สะสม', 'เก็บไว้'],
+    res.values.map((v, k) => [PC(k), v, res.pct[k], res.cumPct[k], k < m ? 'ใช่' : '-']), { sheet: 'Eigenvalues', hl: r => r < m });
+  addTable(`Component Loadings (${mShow} องค์ประกอบ) และ Communality`, ['ตัวแปร', ...labs.slice(0, mShow), `Communality (${m} PC)`],
+    res.loadings.map((row, j) => [names[j], ...row.slice(0, mShow), comm[j]]), { sheet: 'Loadings', hl: (r, c, v) => c > 0 && c <= mShow && Math.abs(v) >= 0.5, note: 'Loading = สหสัมพันธ์ระหว่างตัวแปรกับองค์ประกอบ · ไฮไลต์ |loading| ≥ 0.50' });
+  addTable('Eigenvectors (สัมประสิทธิ์ขององค์ประกอบ)', ['ตัวแปร', ...labs], names.map((nm, j) => [nm, ...res.vectors.map(v => v[j])]), { sheet: 'Eigenvectors' });
+  addTable('คะแนนองค์ประกอบ (Component Scores)', ['ป้ายกำกับ', ...labs.slice(0, mShow)], res.scores.map((r, i) => [labels[i], ...r.slice(0, mShow)]), { sheet: 'Scores' });
+}
+
+// ================= CLUSTER =================
+function runCluster(method, X, opt, info) {
+  const { n, p, names, labels, desc } = info;
+  const means = desc.map(d => d.mean), sds = desc.map(d => d.sd);
+  const Z = opt.std ? S.standardize(X, means, sds) : X.map(r => r.slice());
+  const kMax = Math.min(10, n - 1);
+  const silByK = {}, wssByK = {}, cache = {};
+  const nInit = n > 5000 ? 3 : n > 2000 ? 5 : 10;
+  let tree = null;
+  const tssAll = S.clusterMetrics(Z, new Array(n).fill(0), 1).TSS;
+  wssByK[1] = tssAll;
+  if (method === 'kmeans') {
+    for (let k = 2; k <= kMax; k++) { const r = S.kmeans(Z, k, { nInit }); cache[k] = r; wssByK[k] = r.wss; silByK[k] = S.silhouette(Z, r.labels, k).avg; }
+  } else {
+    tree = S.hclust(Z, opt.link);
+    for (let k = 2; k <= kMax; k++) { const lb = S.cutTree(tree.merges, n, k); cache[k] = { labels: lb }; silByK[k] = S.silhouette(Z, lb, k).avg; wssByK[k] = S.clusterMetrics(Z, lb, k).WSS; }
+  }
+  const ks = Object.keys(silByK).map(Number);
+  const bestK = ks.reduce((b, k) => (silByK[k] > silByK[b] ? k : b), ks[0]);
+  const k = opt.kMode === 'auto' ? bestK : opt.k;
+  const fin = cache[k] || (method === 'kmeans' ? S.kmeans(Z, k, { nInit }) : { labels: S.cutTree(tree.merges, n, k) });
+  const lab = fin.labels;
+  const met = S.clusterMetrics(Z, lab, k);
+  const sil = S.silhouette(Z, lab, k);
+  const silC = new Array(k).fill(0), silN = new Array(k).fill(0);
+  sil.values.forEach((v, i) => { if (Number.isFinite(v)) { silC[lab[i]] += v; silN[lab[i]]++; } });
+  const an = S.anova(X, lab, k);
+  // centers in original units and standardized
+  const cOrig = Array.from({ length: k }, () => new Array(p).fill(0));
+  X.forEach((r, i) => r.forEach((v, j) => (cOrig[lab[i]][j] += v / met.cnt[lab[i]])));
+  const cStd = cOrig.map(c => c.map((v, j) => (v - means[j]) / sds[j]));
+  const CL = c => `กลุ่ม ${c + 1}`;
+  // projection for plotting
+  const pr = p >= 2 ? S.pca(X, opt.std) : null;
+  const pts = i => pr ? [pr.scores[i][0], pr.scores[i][1]] : [Z[i][0], 0];
+
+  // stats cards
+  addStat('จำนวนข้อมูล (N)', n.toLocaleString(), info.dropped ? `ตัดออก ${info.dropped} แถว` : 'ไม่มีข้อมูลสูญหาย');
+  addStat('จำนวนกลุ่ม (k)', k, opt.kMode === 'auto' ? 'เลือกจาก Silhouette สูงสุด' : 'กำหนดเอง');
+  addStat('Silhouette เฉลี่ย', sil.avg.toFixed(3), silLevel(sil.avg).split(' (')[0]);
+  addStat('BSS / TSS', pctS(met.BSS / met.TSS * 100), 'สัดส่วนความแปรปรวนระหว่างกลุ่ม');
+  addStat('Calinski–Harabasz', f2(met.CH), 'ยิ่งสูงยิ่งดี');
+  addStat('Davies–Bouldin', f3(met.DB), 'ยิ่งต่ำยิ่งดี');
+
+  // interpretation
+  const L = [];
+  L.push(`วิเคราะห์ข้อมูล <b>${n.toLocaleString()}</b> หน่วย จาก <b>${p}</b> ตัวแปร (${names.map(esc).join(', ')}) ด้วย${method === 'kmeans' ? `วิธี <b>K-Means</b> (เริ่มต้นแบบ k-means++ จำนวน ${nInit} รอบ เลือกผลที่ WSS ต่ำที่สุด)` : `วิธี <b>Hierarchical clustering</b> แบบ <b>${LINK_NAMES[opt.link]}</b> ด้วยระยะทางแบบยุคลิด`} ${opt.std ? 'บนข้อมูลที่ปรับมาตรฐาน (Z-score)' : 'บนข้อมูลดิบ (ไม่ได้ปรับมาตรฐาน — ตัวแปรที่มีหน่วยใหญ่จะมีอิทธิพลมากกว่า)'}`);
+  L.push(opt.kMode === 'auto'
+    ? `<b>จำนวนกลุ่มที่เหมาะสม:</b> k = <b>${k}</b> ให้ค่า Silhouette เฉลี่ยสูงสุด (${silByK[k].toFixed(3)}) เมื่อทดสอบ k = 2 ถึง ${kMax}`
+    : `<b>จำนวนกลุ่ม:</b> ผู้ใช้กำหนด k = <b>${k}</b>; ${silByK[k] !== undefined ? `ค่า Silhouette = ${silByK[k].toFixed(3)} ` : ''}ในช่วง k = 2–${kMax} ค่า Silhouette สูงสุดอยู่ที่ k = ${bestK} (${silByK[bestK].toFixed(3)})`);
+  L.push(`<b>คุณภาพการจัดกลุ่ม:</b> Silhouette เฉลี่ย = <b>${sil.avg.toFixed(3)}</b> → ${silLevel(sil.avg)}; ความแปรปรวนระหว่างกลุ่มคิดเป็น <b>${pctS(met.BSS / met.TSS * 100)}</b> ของความแปรปรวนทั้งหมด (BSS = ${f2(met.BSS)}, WSS = ${f2(met.WSS)}, TSS = ${f2(met.TSS)}); Calinski–Harabasz = ${f2(met.CH)}, Davies–Bouldin = ${f3(met.DB)}`);
+  L.push(`<b>ขนาดกลุ่ม:</b> ` + met.cnt.map((c, i) => `${CL(i)} = ${c.toLocaleString()} (${(c / n * 100).toFixed(1)}%)`).join(', '));
+  const ranked = an.map((a, j) => ({ ...a, name: names[j] })).sort((a, b) => b.eta2 - a.eta2);
+  L.push(`<b>ตัวแปรที่แยกกลุ่มได้ดีที่สุด (η² สูงสุด):</b> ` + ranked.slice(0, 3).map(a => `${esc(a.name)} (η² = ${a.eta2.toFixed(3)}, F(${a.df1}, ${a.df2}) = ${f2(a.F)}, p ${a.p < 0.001 ? '< 0.001' : '= ' + a.p.toFixed(3)})`).join('; '));
+  const ns = ranked.filter(a => a.p >= 0.05);
+  if (ns.length) L.push(`<b>ตัวแปรที่ค่าเฉลี่ยไม่แตกต่างระหว่างกลุ่ม (p ≥ 0.05):</b> ${ns.map(a => esc(a.name)).join(', ')} — ตัวแปรเหล่านี้แทบไม่มีส่วนในการแบ่งกลุ่ม`);
+  const prof = cStd.map((c, ci) => {
+    const hi = c.map((v, j) => ({ v, n: names[j] })).filter(o => o.v >= 0.5).sort((a, b) => b.v - a.v).map(o => `${esc(o.n)} (+${o.v.toFixed(2)} SD)`);
+    const lo = c.map((v, j) => ({ v, n: names[j] })).filter(o => o.v <= -0.5).sort((a, b) => a.v - b.v).map(o => `${esc(o.n)} (${o.v.toFixed(2)} SD)`);
+    return `<li><b>${CL(ci)}</b> (n = ${met.cnt[ci]}): ${hi.length ? 'สูงกว่าค่าเฉลี่ยรวมใน ' + hi.join(', ') : ''}${hi.length && lo.length ? '; ' : ''}${lo.length ? 'ต่ำกว่าค่าเฉลี่ยรวมใน ' + lo.join(', ') : ''}${!hi.length && !lo.length ? 'ค่าใกล้เคียงค่าเฉลี่ยรวมในทุกตัวแปร (ต่างไม่เกิน ±0.5 SD)' : ''}</li>`;
+  }).join('');
+  $('#interp').innerHTML = `<h3>📝 สรุปและการตีความผล</h3><ul>${L.map(x => `<li>${x}</li>`).join('')}<li><b>ลักษณะเด่นของแต่ละกลุ่ม</b> (เทียบกับค่าเฉลี่ยรวม ในหน่วยส่วนเบี่ยงเบนมาตรฐาน):<ul>${prof}</ul></li></ul>
+    <p class="note">เกณฑ์ Silhouette (Kaufman &amp; Rousseeuw, 1990): &gt; 0.70 ชัดเจนมาก · 0.51–0.70 สมเหตุสมผล · 0.26–0.50 อ่อน · ≤ 0.25 ไม่มีโครงสร้าง · ค่า p ของ ANOVA ในการวิเคราะห์กลุ่มมักต่ำกว่าความเป็นจริง เพราะกลุ่มถูกสร้างให้แตกต่างกันมากที่สุด จึงควรใช้เพื่อบรรยายลักษณะกลุ่ม ไม่ใช่ทดสอบสมมติฐาน${sil.sampled ? ' · ข้อมูลมากกว่า 2,000 แถว ค่า Silhouette จึงคำนวณจากตัวอย่างสุ่ม 2,000 แถว' : ''}</p>`;
+
+  // charts
+  if (method === 'hclust') {
+    addCustomChart(`Dendrogram (${LINK_NAMES[opt.link]}) — ตัดที่ k = ${k}`, (cv, title) => drawDendrogram(cv, tree, n, k, lab, labels, title), { desc: 'เส้นประสีแดงคือระดับที่ตัดแบ่งกลุ่ม แต่ละสีแทนหนึ่งกลุ่ม ความสูงของจุดเชื่อมแสดงระยะห่างขณะรวมกลุ่ม — การกระโดดของความสูงมากๆ บ่งชี้จำนวนกลุ่มที่เหมาะสม' });
+  }
+  const kList = Object.keys(wssByK).map(Number).sort((a, b) => a - b);
+  addChart('Elbow Method (Within-cluster Sum of Squares)', {
+    type: 'line',
+    data: { labels: kList, datasets: [{ label: 'WSS', data: kList.map(x => wssByK[x]), borderColor: '#2f5bea', backgroundColor: kList.map(x => x === k ? '#e4572e' : '#2f5bea'), pointRadius: kList.map(x => x === k ? 8 : 4), tension: .15 }] },
+    options: { plugins: { legend: { display: false } }, scales: { x: axis('จำนวนกลุ่ม (k)'), y: axis('WSS', { beginAtZero: true }) } }
+  }, { desc: 'จุด “ข้อศอก” ที่ WSS เริ่มลดลงช้า คือจำนวนกลุ่มที่เหมาะสม (จุดสีส้ม = k ที่ใช้)' });
+  addChart('ค่า Silhouette เฉลี่ยตามจำนวนกลุ่ม', {
+    type: 'bar',
+    data: { labels: ks, datasets: [{ label: 'Silhouette', data: ks.map(x => silByK[x]), backgroundColor: ks.map(x => x === k ? '#e4572e' : x === bestK ? '#17a398' : alpha('#2f5bea', .7)), borderRadius: 4 }] },
+    options: { plugins: { legend: { display: false } }, scales: { x: axis('จำนวนกลุ่ม (k)'), y: axis('Silhouette เฉลี่ย', { suggestedMin: 0, suggestedMax: 1 }) } }
+  }, { desc: 'ค่ายิ่งสูงยิ่งแยกกลุ่มได้ดี (แท่งสีส้ม = k ที่ใช้, สีเขียว = k ที่ดีที่สุด)' });
+
+  const scDs = Array.from({ length: k }, (_, c) => ({ label: CL(c), data: [], backgroundColor: alpha(color(c), .65), borderColor: color(c), pointRadius: n > 1000 ? 2 : 4 }));
+  for (let i = 0; i < n; i++) { const [x, y] = pts(i); scDs[lab[i]].data.push({ x, y, label: labels[i] }); }
+  if (method === 'kmeans' && pr) {
+    const cen = cOrig.map(c => { const z = c.map((v, j) => opt.std ? (v - means[j]) / sds[j] : v - means[j]); return pr.vectors.slice(0, 2).map(vec => vec.reduce((s, w, j) => s + w * z[j], 0)); });
+    scDs.push({ label: 'จุดศูนย์กลางกลุ่ม', data: cen.map((c, i) => ({ x: c[0], y: c[1], label: 'Centroid ' + CL(i) })), pointStyle: 'crossRot', pointRadius: 11, borderWidth: 3, borderColor: '#111', backgroundColor: '#111' });
+  }
+  addChart(pr ? `กราฟกระจายของกลุ่มบนองค์ประกอบหลัก (PC1 ${pr.pct[0].toFixed(1)}%, PC2 ${pr.pct[1].toFixed(1)}%)` : 'กราฟกระจายของกลุ่ม', {
+    type: 'scatter', data: { datasets: scDs },
+    options: { plugins: { tooltip: pointTip }, scales: { x: axis(pr ? `PC1 (${pr.pct[0].toFixed(1)}%)` : names[0]), y: axis(pr ? `PC2 (${pr.pct[1].toFixed(1)}%)` : '') } }
+  }, { wide: true, desc: 'ฉายข้อมูลหลายมิติลงบน 2 องค์ประกอบหลักแรกเพื่อดูการแยกตัวของกลุ่ม (กลุ่มอาจดูซ้อนกันได้ถ้า PC1+PC2 อธิบายความแปรปรวนได้ไม่มาก)' });
+
+  addChart('Cluster Profile (ค่าเฉลี่ยมาตรฐานของแต่ละกลุ่ม)', {
+    type: 'line',
+    data: { labels: names, datasets: cStd.map((c, ci) => ({ label: CL(ci), data: c, borderColor: color(ci), backgroundColor: color(ci), pointRadius: 5, tension: .1 })) },
+    options: { scales: { x: axis('ตัวแปร'), y: axis('Z-score ของค่าเฉลี่ยกลุ่ม') } }
+  }, { desc: 'ค่า 0 = เท่าค่าเฉลี่ยรวม ค่าบวก/ลบ = สูง/ต่ำกว่าค่าเฉลี่ยรวม (หน่วย SD)' });
+  addChart('ขนาดของแต่ละกลุ่ม', {
+    type: 'bar',
+    data: { labels: met.cnt.map((_, c) => CL(c)), datasets: [{ label: 'จำนวน', data: met.cnt, backgroundColor: met.cnt.map((_, c) => color(c)), borderRadius: 5 }] },
+    options: { plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => `${c.raw} หน่วย (${(c.raw / n * 100).toFixed(1)}%)` } } }, scales: { x: axis('กลุ่ม'), y: axis('จำนวนหน่วย', { beginAtZero: true }) } }
+  });
+  addChart('ความสำคัญของตัวแปรในการแบ่งกลุ่ม (η²)', {
+    type: 'bar',
+    data: { labels: ranked.map(a => a.name), datasets: [{ label: 'η²', data: ranked.map(a => a.eta2), backgroundColor: ranked.map(a => a.p < 0.05 ? '#17a398' : '#b8c0d0'), borderRadius: 4 }] },
+    options: { indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: axis('Eta squared (η²)', { min: 0, max: 1 }), y: axis('ตัวแปร') } }
+  }, { desc: 'η² คือสัดส่วนความแปรปรวนของตัวแปรที่อธิบายได้ด้วยการแบ่งกลุ่ม (สีเทา = ไม่มีนัยสำคัญที่ 0.05)' });
+
+  // tables
+  descTable(info);
+  addTable('การเลือกจำนวนกลุ่ม (k)', ['k', 'WSS', 'ลดลงจาก k−1 (%)', 'Silhouette เฉลี่ย', 'หมายเหตุ'],
+    kList.map(x => [x, wssByK[x], x > 1 ? (1 - wssByK[x] / wssByK[x - 1]) * 100 : null, silByK[x] ?? null, [x === bestK ? 'Silhouette สูงสุด' : '', x === k ? 'k ที่ใช้' : ''].filter(Boolean).join(', ') || '-']),
+    { sheet: 'Choose_k', dec: { 2: 2 }, hl: (r, c) => kList[r] === k });
+  addTable('สรุปผลรายกลุ่ม', ['กลุ่ม', 'จำนวน', 'ร้อยละ', 'Silhouette เฉลี่ย', 'ระยะเฉลี่ยถึงจุดศูนย์กลาง', 'WSS ของกลุ่ม'],
+    met.cnt.map((c, ci) => { let w = 0; lab.forEach((l, i) => { if (l === ci) w += met.dist[i] ** 2; }); return [CL(ci), c, c / n * 100, silN[ci] ? silC[ci] / silN[ci] : null, met.sAvg[ci], w]; }),
+    { sheet: 'Cluster_Summary', dec: { 2: 2 } });
+  addTable('ค่าเฉลี่ยของตัวแปรในแต่ละกลุ่ม (Cluster Centers — หน่วยเดิม)', ['ตัวแปร', ...met.cnt.map((_, c) => CL(c)), 'ค่าเฉลี่ยรวม'],
+    names.map((nm, j) => [nm, ...cOrig.map(c => c[j]), means[j]]), { sheet: 'Centers', dec: Object.fromEntries(names.map((_, j) => [0, 4])) });
+  addTable('ค่าเฉลี่ยมาตรฐานของแต่ละกลุ่ม (Z-score)', ['ตัวแปร', ...met.cnt.map((_, c) => CL(c))],
+    names.map((nm, j) => [nm, ...cStd.map(c => c[j])]), { sheet: 'Centers_Z', hl: (r, c, v) => c > 0 && Math.abs(v) >= 0.5, note: 'ไฮไลต์ |Z| ≥ 0.50 คือลักษณะเด่นของกลุ่ม' });
+  addTable('การวิเคราะห์ความแปรปรวน (ANOVA) ระหว่างกลุ่ม', ['ตัวแปร', 'SS ระหว่างกลุ่ม', 'df1', 'SS ภายในกลุ่ม', 'df2', 'F', 'p-value', 'η²'],
+    an.map((a, j) => [names[j], a.ssb, a.df1, a.ssw, a.df2, a.F, a.p, a.eta2]), { sheet: 'ANOVA', pCols: [6], hl: (r, c, v) => c === 6 && v < 0.05 });
+  if (method === 'hclust') {
+    addTable('Agglomeration Schedule (ลำดับการรวมกลุ่ม)', ['ขั้นที่', 'รวมโหนด A', 'รวมโหนด B', 'ระยะทาง (Height)', 'จำนวนสมาชิก', 'จำนวนกลุ่มหลังรวม'],
+      tree.merges.map((m, s) => [s + 1, m[0] < n ? labels[m[0]] : `โหนด ${m[0] - n + 1}`, m[1] < n ? labels[m[1]] : `โหนด ${m[1] - n + 1}`, m[2], m[3], n - s - 1]),
+      { sheet: 'Agglomeration', note: '“โหนด s” หมายถึงกลุ่มที่เกิดจากการรวมในขั้นที่ s' });
+  }
+  const memHead = ['ป้ายกำกับ', 'กลุ่ม', 'Silhouette', 'ระยะถึงจุดศูนย์กลาง', ...(pr ? ['PC1', 'PC2'] : []), ...names];
+  addTable('ผลการจัดกลุ่มรายหน่วย (Cluster Membership)', memHead,
+    X.map((r, i) => [labels[i], CL(lab[i]), Number.isFinite(sil.values[i]) ? sil.values[i] : null, met.dist[i], ...(pr ? [pr.scores[i][0], pr.scores[i][1]] : []), ...r]),
+    { sheet: 'Membership', hl: (r, c, v) => c === 2 && typeof v === 'number' && v < 0, note: 'ไฮไลต์ Silhouette ติดลบ = หน่วยที่อาจถูกจัดผิดกลุ่ม (อยู่ใกล้กลุ่มอื่นมากกว่า)' });
+}
+
+// ---------- dendrogram ----------
+function drawDendrogram(canvas, tree, n, k, lab, names, title) {
+  const box = canvas.parentElement, W = Math.max(320, box.clientWidth), H = box.clientHeight, dpr = 2;
+  canvas.width = W * dpr; canvas.height = H * dpr; canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
+  const ctx = canvas.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = '#1d2433'; ctx.font = "600 15px 'Prompt', sans-serif"; ctx.textAlign = 'center'; ctx.fillText(title, W / 2, 22);
+  const merges = tree.merges, showLbl = n <= 70;
+  const padL = 64, padR = 18, padT = 52, padB = showLbl ? 92 : 28;
+  const pw = W - padL - padR, ph = H - padT - padB, maxH = merges[n - 2][2] || 1;
+  const order = [], st = [2 * n - 2];
+  while (st.length) { const id = st.pop(); if (id < n) { order.push(id); continue; } const m = merges[id - n]; st.push(m[1]); st.push(m[0]); }
+  const xs = new Float64Array(2 * n - 1), hs = new Float64Array(2 * n - 1), cl = new Int32Array(2 * n - 1);
+  order.forEach((leaf, i) => { xs[leaf] = padL + (i + 0.5) * pw / n; cl[leaf] = lab[leaf]; });
+  const Y = h => padT + ph * (1 - h / maxH);
+  // axis
+  ctx.strokeStyle = '#c9cfdc'; ctx.fillStyle = '#5d6678'; ctx.font = "12px 'Sarabun', sans-serif"; ctx.textAlign = 'right'; ctx.lineWidth = 1;
+  for (let t = 0; t <= 5; t++) { const h = maxH * t / 5, y = Y(h); ctx.beginPath(); ctx.moveTo(padL - 5, y); ctx.lineTo(W - padR, y); ctx.strokeStyle = t ? '#f0f2f7' : '#c9cfdc'; ctx.stroke(); ctx.fillText(fmt(h, 2), padL - 8, y + 4); }
+  ctx.save(); ctx.translate(16, padT + ph / 2); ctx.rotate(-Math.PI / 2); ctx.textAlign = 'center'; ctx.font = "600 13px 'Sarabun', sans-serif"; ctx.fillText('ระยะทาง (Height)', 0, 0); ctx.restore();
+  ctx.lineWidth = n > 400 ? 0.6 : n > 120 ? 1 : 1.5;
+  for (let s = 0; s < n - 1; s++) {
+    const [a, b, h] = merges[s], id = n + s;
+    xs[id] = (xs[a] + xs[b]) / 2; hs[id] = h; cl[id] = cl[a] === cl[b] && cl[a] >= 0 ? cl[a] : -1;
+    ctx.strokeStyle = cl[id] >= 0 ? color(cl[id]) : '#7a8296';
+    ctx.beginPath(); ctx.moveTo(xs[a], Y(hs[a])); ctx.lineTo(xs[a], Y(h)); ctx.lineTo(xs[b], Y(h)); ctx.lineTo(xs[b], Y(hs[b])); ctx.stroke();
+  }
+  if (k >= 2 && n - k - 1 >= 0) {
+    const hc = (merges[n - k][2] + merges[n - k - 1][2]) / 2, y = Y(hc);
+    ctx.save(); ctx.setLineDash([7, 5]); ctx.strokeStyle = '#d93f3f'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(W - padR, y); ctx.stroke(); ctx.restore();
+    ctx.fillStyle = '#d93f3f'; ctx.textAlign = 'right'; ctx.font = "600 12px 'Sarabun', sans-serif"; ctx.fillText(`ตัดที่ระยะ ${fmt(hc, 2)} → ${k} กลุ่ม`, W - padR, y - 6);
+  }
+  if (showLbl) {
+    ctx.fillStyle = '#3b4357'; ctx.font = "11px 'Sarabun', sans-serif"; ctx.textAlign = 'right';
+    order.forEach(leaf => { ctx.save(); ctx.translate(xs[leaf] + 3, padT + ph + 8); ctx.rotate(-Math.PI / 2); ctx.fillStyle = color(lab[leaf]); const t = String(names[leaf]); ctx.fillText(t.length > 14 ? t.slice(0, 13) + '…' : t, 0, 0); ctx.restore(); });
+  }
+  // legend
+  ctx.font = "12px 'Sarabun', sans-serif"; ctx.textAlign = 'left';
+  let lx = padL; const ly = 38;
+  for (let c = 0; c < k; c++) { const txt = `กลุ่ม ${c + 1}`; const w = ctx.measureText(txt).width + 26; if (lx + w > W - padR) break; ctx.fillStyle = color(c); ctx.fillRect(lx, ly - 9, 12, 12); ctx.fillStyle = '#3b4357'; ctx.fillText(txt, lx + 16, ly + 1); lx += w; }
+}
+
+// ---------- reset ----------
+$('#btnReset').onclick = () => {
+  clearResults(); state = freshState();
+  fileInput.value = '';
+  $('#fileName').innerHTML = '📁 คลิกเพื่อเลือกไฟล์ หรือลากไฟล์มาวางที่นี่<br><small>แถวแรกต้องเป็นชื่อคอลัมน์</small>';
+  ['#sheetSel', '#labelCol', '#colList', '#previewBox'].forEach(s => ($(s).innerHTML = ''));
+  $('#dataSetup').classList.add('hidden'); $('#results').classList.add('hidden');
+  $('#method').value = 'kmeans'; $('#optStd').checked = true; $('#optKMode').value = 'auto'; $('#optK').value = 3; $('#optK').disabled = true;
+  $('#optLink').value = 'ward'; $('#optPcMode').value = 'kaiser'; $('#optPc').value = 2; $('#optPc').disabled = true;
+  syncMethod(); showMsg(''); window.scrollTo({ top: 0, behavior: 'smooth' });
+};
+
+syncMethod();
+</script>
+</body>
+</html>
